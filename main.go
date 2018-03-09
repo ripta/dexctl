@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 
 	"github.com/coreos/dex/api"
@@ -12,27 +15,47 @@ import (
 )
 
 var (
+	clientCertPath = flag.String("client-cert", "", "Path to client certificate")
+	clientKeyPath  = flag.String("client-key", "", "Path to client key")
+
 	dexCAPath = flag.String("ca-cert", "/etc/dex/grpc.crt", "Path to CA certificate")
 	dexHost   = flag.String("dex-host", "127.0.0.1:5557", "The host:port to dex's gRPC port")
 )
 
-func newDexClient(hostAndPort, caPath string) (api.DexClient, error) {
-	creds, err := credentials.NewClientTLSFromFile(caPath, "")
+func newDexClient(hostAndPort, caPath, clientCertPath, clientKeyPath string) (api.DexClient, error) {
+	cpool := x509.NewCertPool()
+	caCert, err := ioutil.ReadFile(caPath)
 	if err != nil {
-		return nil, fmt.Errorf("load dex cert: %v", err)
+		return nil, fmt.Errorf("failed to load CA certificate: %v", err)
 	}
 
+	if !cpool.AppendCertsFromPEM(caCert) {
+		return nil, fmt.Errorf("failed to parse CA certificate: %v", err)
+	}
+
+	clientCreds, err := tls.LoadX509KeyPair(clientCertPath, clientKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("invalid client credentials: %v", err)
+	}
+
+	clientTLS := &tls.Config{
+		RootCAs:      cpool,
+		Certificates: []tls.Certificate{clientCreds},
+	}
+
+	creds := credentials.NewTLS(clientTLS)
 	conn, err := grpc.Dial(hostAndPort, grpc.WithTransportCredentials(creds))
 	if err != nil {
 		return nil, fmt.Errorf("dial: %v", err)
 	}
+
 	return api.NewDexClient(conn), nil
 }
 
 func main() {
 	flag.Parse()
 
-	client, err := newDexClient(*dexHost, *dexCAPath)
+	client, err := newDexClient(*dexHost, *dexCAPath, *clientCertPath, *clientKeyPath)
 	if err != nil {
 		log.Fatalf("failed creating dex client: %v ", err)
 	}
