@@ -54,30 +54,48 @@ func newDexClient(hostAndPort, caPath, clientCertPath, clientKeyPath string) (ap
 
 func main() {
 	flag.Parse()
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
 
+func run() error {
 	client, err := newDexClient(*dexHost, *dexCAPath, *clientCertPath, *clientKeyPath)
 	if err != nil {
-		log.Fatalf("failed creating dex client: %v ", err)
+		return fmt.Errorf("failed creating dex client: %v ", err)
 	}
 
+	if err := getVersion(client); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func createClient(client api.DexClient) error {
+	req := &api.CreateClientReq{
+		Client: &api.Client{
+			Id:           "example-app",
+			Name:         "Example App",
+			Secret:       "ZXhhbXBsZS1hcHAtc2VjcmV0",
+			RedirectUris: []string{"http://127.0.0.1:5555/callback"},
+		},
+	}
+
+	if _, err := client.CreateClient(context.TODO(), req); err != nil {
+		fmt.Errorf("failed creating oauth2 client: %v", err)
+	}
+
+	return nil
+}
+
+func getVersion(client api.DexClient) error {
 	req := &api.VersionReq{}
 	rsp, err := client.GetVersion(context.Background(), req)
 	if err != nil {
-		log.Fatalf("failed querying for version: %v", err)
+		return fmt.Errorf("failed querying for version: %v", err)
 	}
 
 	log.Printf("got version: %+v", rsp)
-
-	// req := &api.CreateClientReq{
-	// 	Client: &api.Client{
-	// 		Id:           "example-app",
-	// 		Name:         "Example App",
-	// 		Secret:       "ZXhhbXBsZS1hcHAtc2VjcmV0",
-	// 		RedirectUris: []string{"http://127.0.0.1:5555/callback"},
-	// 	},
-	// }
-
-	// if _, err := client.CreateClient(context.TODO(), req); err != nil {
-	// 	log.Fatalf("failed creating oauth2 client: %v", err)
-	// }
+	return nil
 }
