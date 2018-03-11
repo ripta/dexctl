@@ -92,6 +92,8 @@ func createClient(client api.DexClient, path string) error {
 		return fmt.Errorf("failed to parse %s: %v", path, err)
 	}
 
+	log.Printf("loaded: %+v", ac)
+
 	req := &api.CreateClientReq{
 		Client: ac,
 	}

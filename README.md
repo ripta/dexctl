@@ -45,5 +45,7 @@ Quickstart
     public: true
   ```
 
-Refer to `type Client` in `vendor/github.com/coreos/dex/api/api.pb.go` to see the full structure.
+Refer to `type Client` in `vendor/github.com/coreos/dex/api/api.pb.go` to see
+the full structure. The struct does not (as of March 2018) come with YAML tags;
+the YAML keys should be lowercased in such a case (e.g., `redirecturis`).
 
