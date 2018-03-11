@@ -12,6 +12,7 @@ import (
 	"github.com/coreos/dex/api"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"gopkg.in/yaml.v2"
 )
 
 var (
@@ -54,12 +55,12 @@ func newDexClient(hostAndPort, caPath, clientCertPath, clientKeyPath string) (ap
 
 func main() {
 	flag.Parse()
-	if err := run(); err != nil {
+	if err := run(flag.Args()); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run() error {
+func run(args []string) error {
 	client, err := newDexClient(*dexHost, *dexCAPath, *clientCertPath, *clientKeyPath)
 	if err != nil {
 		return fmt.Errorf("failed creating dex client: %v ", err)
@@ -69,23 +70,38 @@ func run() error {
 		return err
 	}
 
+	if len(args) < 1 {
+		return fmt.Errorf("specify path to YAML file to create client")
+	}
+
+	if err := createClient(client, args[0]); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func createClient(client api.DexClient) error {
+func createClient(client api.DexClient, path string) error {
+	content, err := ioutil.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("failed to read %s: %v", path, err)
+	}
+
+	var ac *api.Client
+	if err := yaml.Unmarshal(content, &ac); err != nil {
+		return fmt.Errorf("failed to parse %s: %v", path, err)
+	}
+
 	req := &api.CreateClientReq{
-		Client: &api.Client{
-			Id:           "example-app",
-			Name:         "Example App",
-			Secret:       "ZXhhbXBsZS1hcHAtc2VjcmV0",
-			RedirectUris: []string{"http://127.0.0.1:5555/callback"},
-		},
+		Client: ac,
 	}
 
-	if _, err := client.CreateClient(context.TODO(), req); err != nil {
-		fmt.Errorf("failed creating oauth2 client: %v", err)
+	rsp, err := client.CreateClient(context.TODO(), req)
+	if err != nil {
+		return fmt.Errorf("failed creating oauth2 client: %v", err)
 	}
 
+	log.Printf("got create client response: %+v", rsp)
 	return nil
 }
 
