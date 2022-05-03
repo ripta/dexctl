@@ -15,3 +15,5 @@ dexctl
 certs
 data
 oauth2clients
+vendor
+bin/dexctl
